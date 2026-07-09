@@ -10,8 +10,6 @@
 
 </div>
 
-<div align="center">
-
 **Izanami** is a server plugin that replaces the vanilla 1.8 world generator with a modern,
 fully-configurable one : biome control, 1.18-style noise caves, cave biomes, underground
 rivers, amethyst geodes, schematic structures, and a square pre-generator, while keeping
