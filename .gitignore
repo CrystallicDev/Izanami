@@ -1,0 +1,7 @@
+.gradle/
+build/
+libs/
+textures/*.zip
+*.class
+.idea/
+*.iml

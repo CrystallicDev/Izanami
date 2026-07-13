@@ -1,0 +1,70 @@
+# Izanami - generation et pregeneration de monde (Sukkit WorldGen)
+#
+# Les mondes listes ici sont geres par Izanami. Ceux avec "autoload: true"
+# sont crees/charges automatiquement au demarrage du serveur.
+#
+# Section "biomes" (optionnelle - sans elle, biomes vanilla) :
+#   cell-size : taille approximative des zones de biomes, en blocs (defaut 256)
+#   allowed   : biomes possibles, avec un poids relatif (nom: poids),
+#               ou simple liste YAML (poids 1). Noms tolerants :
+#               "Extreme Hills", "extreme_hills" et l'ID numerique marchent.
+#   center    : biome force au centre de la carte, sur une zone carree
+#               de -radius a +radius (defaut 250) autour de (0,0).
+#
+# Exemple complet :
+#
+# worlds:
+#   uhc_saison1:
+#     seed: 0            # 0 = aleatoire (la seed reelle est figee a la creation)
+#     autoload: true
+#     biomes:
+#       cell-size: 256
+#       border-noise: 24       # amplitude (blocs) du bruit des bordures de biomes, 0 = droites
+#       allowed:
+#         plains: 3
+#         forest: 2
+#         extreme_hills: 1
+#         roofed_forest: 1
+#       center:
+#         biome: desert
+#         radius: 250          # rayon (circulaire) de la zone centrale
+#         edge-noise: 30       # irregularite du bord de la zone centrale (0 = cercle net)
+#         exclusion-radius: 400 # le biome central est INTERDIT entre le bord et cette limite
+#     terrain:
+#       base-height: 100       # hauteur moyenne du sol (vanilla 64). Une valeur haute
+#                              # donne plus de volume aux cavernes (facon 1.18+).
+#                              # Le niveau de la mer suit (base-height - 1).
+#     caves:
+#       style: modern          # modern = cavernes a bruit type 1.18+ | vanilla | none
+#       cheese: true           # grandes salles
+#       spaghetti: true        # tunnels sinueux
+#       noodle: true           # boyaux etroits
+#     rivers:                  # rivieres de SURFACE (creusent le relief - attention en PvP)
+#       enabled: true
+#       width: 16              # largeur approximative (blocs)
+#       scale: 300             # longueur d'onde des meandres (blocs)
+#       depth: 5               # profondeur max au centre
+#     underground-rivers:      # rivieres SOUTERRAINES navigables (biome de cave)
+#       enabled: true
+#       water-level: 0         # y de la surface de l'eau (0 = auto : base-height - 24)
+#       width: 10              # largeur du tunnel
+#       scale: 220             # longueur d'onde des meandres
+#       air-gap: 3             # air au-dessus de l'eau (passage bateaux)
+#       water-depth: 2
+#       waterfall-spacing: 180 # distance approx entre chutes d'entree (puits double cone)
+#       width-variation: 0.6   # variation du rayon le long de la riviere (0 = uniforme)
+#       pool-intensity: 1.0    # ampleur des elargissements en lacs (0 = aucun)
+#       waterfall-radius: 5    # rayon max des puits de chute (double cone : large haut/bas, fin au milieu)
+worlds: {}
+
+# Pregeneration (/izanami pregen <monde> <distance-blocs>)
+#   max-millis-per-tick  : budget max de generation par tick (le budget reel
+#                          s'adapte au TPS : reduit sous target-tps, remonte au-dessus)
+#   target-tps           : TPS plancher a preserver pendant la pregen
+#   max-loaded-chunks    : au-dela, pause le temps que la file d'unload se vide
+#   log-interval-seconds : frequence des logs de progression
+pregen:
+  max-millis-per-tick: 30
+  target-tps: 18.0
+  max-loaded-chunks: 2500
+  log-interval-seconds: 10

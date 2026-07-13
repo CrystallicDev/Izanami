@@ -1,0 +1,26 @@
+name: Izanami
+version: 0.1.0
+main: dev.sukkit.izanami.IzanamiPlugin
+description: Generation et pregeneration de monde custom (Sukkit WorldGen)
+author: Sukkit
+
+commands:
+  izanami:
+    description: Commandes de generation de monde Izanami
+    usage: |
+      /<command> create <monde> [seed] - cree un monde Izanami
+      /<command> load <monde> - charge un monde Izanami existant
+      /<command> tp <monde> - se teleporte au spawn du monde
+      /<command> list - liste les mondes Izanami
+      /<command> info [monde] - infos sur le generateur du monde
+      /<command> pregen <monde> <distance-blocs> - pregenere la zone carree +/-distance
+      /<command> pregen stop <monde> | status - arret / suivi
+      /<command> schem list | reload | paste <nom> - gestion des schematics
+      /<command> cb list | place <nom> | pack - blocs custom (OptiFine)
+    aliases: [iza]
+    permission: izanami.admin
+
+permissions:
+  izanami.admin:
+    description: Acces aux commandes Izanami
+    default: op
