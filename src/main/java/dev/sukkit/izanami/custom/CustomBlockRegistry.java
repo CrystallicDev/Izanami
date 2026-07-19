@@ -97,6 +97,8 @@ public final class CustomBlockRegistry {
         }
         block.model(s.getString("model", null));
         block.attach(CustomBlock.Attach.valueOf(s.getString("attach", "any").toUpperCase(Locale.ROOT)));
+        block.heights(s.getString("heights", null));
+        block.biomes(s.getString("biomes", null));
         return block;
     }
 
@@ -112,12 +114,16 @@ public final class CustomBlockRegistry {
         }
         known.put("pale_oak_log", new String[]{"pale_oak_log.png", "pale_oak_log_top.png", "cube"});
         known.put("azalea", new String[]{"azalea_side.png", "azalea_top.png", "cube"});
-        for (String cross : new String[]{"amethyst_cluster", "bamboo_stalk", "bamboo_stage0",
-                "glow_berry_vine", "small_amethyst_bud", "medium_amethyst_bud",
-                "large_amethyst_bud", "spore_blossom"}) {
+        for (String cross : new String[]{"amethyst_cluster", "bamboo_stage0", "glow_berry_vine",
+                "small_amethyst_bud", "medium_amethyst_bud", "large_amethyst_bud",
+                "spore_blossom", "bamboo_leaves"}) {
             known.put(cross, new String[]{cross + ".png", null, "cross"});
         }
         known.get("glow_berry_vine")[0] = "cave_vines_lit.png"; // pas de png "glow_berry_vine"
+        known.get("bamboo_leaves")[0] = "bamboo_small_leaves.png"; // couronne au sommet des tiges
+        // tige de bambou : le poteau central des nether fences fait déjà la
+        // silhouette (fin, vertical, collision) — simple retexture filtrée jungle
+        known.put("bamboo_stalk", new String[]{"bamboo_stalk.png", null, "fence"});
         known.put("moss_carpet", new String[]{"moss_block.png", null, "layer"});
         // nénuphar réutilisé : pad plat sur l'eau (dripleaf des mares Lush)
         known.put("dripleaf_pad", new String[]{"big_dripleaf_top.png", null, "pad"});
@@ -141,9 +147,14 @@ public final class CustomBlockRegistry {
         columns.put("glow_berry_vine", new String[]{
                 "cave_vines_lit.png", "cave_vines_plant_lit.png",
                 "cave_vines_plant_lit.png", "cave_vines_lit.png"});
-        columns.put("bamboo_stalk", new String[]{
-                "bamboo_stalk.png", "bamboo_stalk.png",
-                "bamboo_small_leaves.png", "bamboo_stage0.png"});
+
+        // filtres client par défaut : la déco souterraine est bornée en hauteur
+        // (au-dessus, l'hôte redevient vanilla en surface), le bambou est filtré
+        // par biomes jungle
+        final String undergroundHeights = "0-80";
+        final String jungleBiomes = "Jungle JungleHills JungleEdge JungleM JungleEdgeM";
+        Set<String> surfaceBlocks = new LinkedHashSet<>(java.util.Arrays.asList(
+                "pale_oak_log", "bamboo_stalk", "bamboo_stage0", "bamboo_leaves"));
 
         boolean changed = false;
         for (Map.Entry<String, String[]> entry : known.entrySet()) {
@@ -165,6 +176,11 @@ public final class CustomBlockRegistry {
                     slot[1], def[0], def[1], CustomBlock.Drops.NONE, "stone");
             if (columns.containsKey(name)) {
                 block.columnTextures(java.util.Arrays.asList(columns.get(name)));
+            }
+            if (name.startsWith("bamboo_")) {
+                block.biomes(jungleBiomes);
+            } else if (!surfaceBlocks.contains(name)) {
+                block.heights(undergroundHeights);
             }
             if ("spore_blossom".equals(name)) {
                 block.model("spore_blossom.json"); // géométrie 3D via blockstates
@@ -224,6 +240,10 @@ public final class CustomBlockRegistry {
                     return slot.clone();
                 }
             }
+        } else if (shape == CustomBlock.Shape.FENCE) {
+            if (!used.contains("113:0")) {
+                return new int[]{113, 0}; // nether_brick_fence : un seul état
+            }
         }
         return null;
     }
@@ -264,7 +284,9 @@ public final class CustomBlockRegistry {
                 + "texture-top: optionnel, texture distincte pour les faces haut/bas (cubes)\n"
                 + "drops: none | placeholder (item placeholder-drop) | default (drop vanilla de l'hote)\n"
                 + "effects-as: bloc dont on emprunte particules/son de casse (ex. stone) - le son de\n"
-                + "pas reste celui de l'hote (client-side, non remappable sans mod)");
+                + "pas reste celui de l'hote (client-side, non remappable sans mod)\n"
+                + "heights: bande 'min-max' ou l'apparence custom s'applique (au-dela : hote vanilla)\n"
+                + "biomes: liste OptiFine ('Jungle JungleHills') ou l'apparence custom s'applique");
         yaml.set("placeholder-drop", this.placeholderDrop);
         ConfigurationSection root = yaml.createSection("blocks");
         for (CustomBlock block : this.blocks.values()) {
@@ -288,6 +310,12 @@ public final class CustomBlockRegistry {
             if (block.getAttach() != CustomBlock.Attach.ANY) {
                 s.set("attach", block.getAttach().name().toLowerCase(Locale.ROOT));
             }
+            if (block.getHeights() != null) {
+                s.set("heights", block.getHeights());
+            }
+            if (block.getBiomes() != null) {
+                s.set("biomes", block.getBiomes());
+            }
         }
         try {
             yaml.save(this.file);
@@ -308,6 +336,7 @@ public final class CustomBlockRegistry {
             case "snow_layer": return 78;
             case "waterlily": return 111;
             case "cobblestone_wall": return 139;
+            case "nether_brick_fence": return 113;
             default:
                 throw new IllegalArgumentException("Bloc de slot non supporte : " + name);
         }
@@ -325,6 +354,7 @@ public final class CustomBlockRegistry {
             case 78: return "snow_layer";
             case 111: return "waterlily";
             case 139: return "cobblestone_wall";
+            case 113: return "nether_brick_fence";
             default:
                 throw new IllegalArgumentException("id " + id);
         }

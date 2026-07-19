@@ -17,7 +17,7 @@ package dev.sukkit.izanami.custom;
  */
 public final class CustomBlock {
 
-    public enum Shape { CUBE, CROSS, LAYER, PAD, WALL }
+    public enum Shape { CUBE, CROSS, LAYER, PAD, WALL, FENCE }
 
     /** Politique de drop à la casse (patch Sukkit CustomBlockBehaviors). */
     public enum Drops { NONE, PLACEHOLDER, DEFAULT }
@@ -48,6 +48,10 @@ public final class CustomBlock {
      */
     private String model;
     private Attach attach = Attach.ANY;
+    /** Filtre de hauteur OptiFine "min-max" : hors bande, l'hôte redevient vanilla. */
+    private String heights;
+    /** Filtre de biomes OptiFine ("Jungle JungleHills") : hors biome, hôte vanilla. */
+    private String biomes;
 
     public CustomBlock(String name, Shape shape, int blockId, String blockName, int meta,
                        String texture, String textureTop, Drops drops, String effectsAs) {
@@ -126,6 +130,37 @@ public final class CustomBlock {
     public CustomBlock attach(Attach attach) {
         this.attach = attach == null ? Attach.ANY : attach;
         return this;
+    }
+
+    public String getHeights() {
+        return this.heights;
+    }
+
+    public CustomBlock heights(String heights) {
+        this.heights = heights == null || heights.trim().isEmpty() ? null : heights.trim();
+        return this;
+    }
+
+    public String getBiomes() {
+        return this.biomes;
+    }
+
+    public CustomBlock biomes(String biomes) {
+        this.biomes = biomes == null || biomes.trim().isEmpty() ? null : biomes.trim();
+        return this;
+    }
+
+    /** Borne haute du filtre de hauteur, ou -1 si aucun filtre. */
+    public int heightCap() {
+        if (this.heights == null) {
+            return -1;
+        }
+        int dash = this.heights.indexOf('-');
+        try {
+            return Integer.parseInt(dash < 0 ? this.heights : this.heights.substring(dash + 1).trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 
     public String slotString() {

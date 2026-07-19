@@ -74,7 +74,8 @@ public final class ResourcePackGenerator {
                 }
                 write(new File(dir, block.getName() + ".properties"),
                         "method=vertical\nmatchBlocks=" + block.getBlockName()
-                                + "\nmetadata=" + block.getMeta() + "\ntiles=" + tiles + '\n');
+                                + "\nmetadata=" + block.getMeta() + "\ntiles=" + tiles + '\n'
+                                + filters(block));
             } else if (block.getTextureTop() == null) {
                 write(new File(dir, block.getName() + ".properties"),
                         ctmProperties(block, block.getName(), null));
@@ -302,6 +303,19 @@ public final class ResourcePackGenerator {
         sb.append("tiles=").append(tile).append('\n');
         if (faces != null) {
             sb.append("faces=").append(faces).append('\n');
+        }
+        sb.append(filters(block));
+        return sb.toString();
+    }
+
+    /** Lignes heights=/biomes= des filtres client du bloc (hors filtre : hôte vanilla). */
+    private static String filters(CustomBlock block) {
+        StringBuilder sb = new StringBuilder();
+        if (block.getHeights() != null) {
+            sb.append("heights=").append(block.getHeights()).append('\n');
+        }
+        if (block.getBiomes() != null) {
+            sb.append("biomes=").append(block.getBiomes()).append('\n');
         }
         return sb.toString();
     }

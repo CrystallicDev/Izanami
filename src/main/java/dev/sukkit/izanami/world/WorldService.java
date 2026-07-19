@@ -8,6 +8,9 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.craftbukkit.v1_8_R3.worldgen.NmsWorldGenRegistry;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.WorldInitEvent;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -20,14 +23,47 @@ import java.util.Map;
  * auprès de Sukkit (toujours AVANT {@code WorldCreator#createWorld()}),
  * création/chargement, et persistance dans config.yml.
  */
-public final class WorldService {
+public final class WorldService implements Listener {
 
     private final IzanamiPlugin plugin;
     private final Map<String, IzanamiWorldConfig> worlds = new LinkedHashMap<>();
     private final Map<String, dev.sukkit.izanami.api.IzanamiBiomeSource> biomeSources = new LinkedHashMap<>();
+    /** Config du monde en cours de création : lue par le handler WorldInitEvent. */
+    private IzanamiWorldConfig pendingConfig;
 
     public WorldService(IzanamiPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    /**
+     * Ajoute les BlockPopulators "sûrs" (écritures locales flag 2, pas de
+     * physique) AVANT la génération de la zone de spawn : WorldInitEvent est
+     * émis pendant createWorld, avant tout peuplement de chunk, donc ils
+     * couvrent aussi le spawn. Les populators qui touchent des voisins (lacs
+     * rayon 24, réveil d'eau via doPhysics) restent ajoutés après createWorld,
+     * hors phase de décoration — sinon "Already decorating".
+     */
+    @EventHandler
+    public void onWorldInit(WorldInitEvent event) {
+        if (this.pendingConfig == null || !event.getWorld().getName().equals(this.pendingConfig.getName())
+                || this.plugin.getCustomBlockRegistry() == null) {
+            return;
+        }
+        World world = event.getWorld();
+        // fleurs vanilla de surface sur les états hôtes des blocs custom à modèle
+        dev.sukkit.izanami.gen.HostCleanupPopulator cleanup =
+                new dev.sukkit.izanami.gen.HostCleanupPopulator(
+                        this.plugin.getCustomBlockRegistry().getAll());
+        if (!cleanup.isEmpty()) {
+            world.getPopulators().add(cleanup);
+        }
+        // bambou dans les biomes jungle (n'agit que si un tel biome existe)
+        dev.sukkit.izanami.gen.BambooPopulator bamboo =
+                dev.sukkit.izanami.gen.BambooPopulator.create(
+                        this.plugin.getCustomBlockRegistry(), 7, 0.7);
+        if (bamboo != null) {
+            world.getPopulators().add(bamboo);
+        }
     }
 
     public IzanamiPlugin getPlugin() {
@@ -113,10 +149,19 @@ public final class WorldService {
             int seaLevel = config.getBaseHeight() - 1;
             creator.generatorSettings("{\"baseSize\":" + baseSize + ",\"seaLevel\":" + seaLevel + "}");
         }
-        World world = creator.createWorld();
+        // populators "sûrs" (bambou, nettoyage de fleurs) ajoutés par onWorldInit
+        // pendant createWorld, pour couvrir la zone de spawn
+        this.pendingConfig = config;
+        World world;
+        try {
+            world = creator.createWorld();
+        } finally {
+            this.pendingConfig = null;
+        }
         long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
 
-        // lacs des biomes de cave : phase populate (voir CaveLakePopulator)
+        // populators qui touchent des chunks voisins : ajoutés HORS phase de
+        // décoration (après createWorld) pour éviter "Already decorating"
         dev.sukkit.izanami.api.IzanamiBiomeSource source = getBiomeSource(config.getName());
         if (source != null && source.getCave() instanceof dev.sukkit.izanami.gen.IzanamiCaveBiomeMap) {
             dev.sukkit.izanami.gen.CaveZoneMap zones =
@@ -125,8 +170,6 @@ public final class WorldService {
                 world.getPopulators().add(new dev.sukkit.izanami.gen.CaveLakePopulator(world.getSeed(), zones));
             }
         }
-
-        // écoulement de l'eau souterraine générée (après les lacs, pour les réveiller aussi)
         if (config.getUndergroundRivers().isEnabled() || config.getRivers().isEnabled()
                 || config.getCaveBiomes().isEnabled()) {
             world.getPopulators().add(new dev.sukkit.izanami.gen.WaterSettlePopulator(config.getBaseHeight()));
@@ -311,6 +354,29 @@ public final class WorldService {
                 }
             }
             message += ", gouffres : " + sunken + " colonnes effondrees";
+        }
+        // surface : tiges de bambou (nether_brick_fence id 113) et troncs (log id 17)
+        int bamboo = 0;
+        int logs = 0;
+        for (int x = -80; x <= 80; x += 2) {
+            for (int z = -80; z <= 80; z += 2) {
+                int surf = world.getHighestBlockYAt(x, z);
+                for (int y = surf - 20; y <= surf; y++) {
+                    int id = net.minecraft.server.v1_8_R3.Block.getId(handle.getType(
+                            new net.minecraft.server.v1_8_R3.BlockPosition(x, y, z)).getBlock());
+                    if (id == 113) {
+                        bamboo++;
+                    } else if (id == 17) {
+                        logs++;
+                    }
+                }
+            }
+        }
+        if (bamboo > 0) {
+            message += ", bambou : " + bamboo + " tiges";
+        }
+        if (logs > 0) {
+            message += ", troncs : " + logs;
         }
         this.plugin.getLogger().info(message);
     }

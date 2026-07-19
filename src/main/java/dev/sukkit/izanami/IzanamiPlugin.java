@@ -24,8 +24,10 @@ public final class IzanamiPlugin extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
         this.worldService = new WorldService(this);
+        getServer().getPluginManager().registerEvents(this.worldService, this);
         this.worldService.loadFromConfig();
         this.pregenService = new PregenService(this);
+        extractBundled("schematics/"); // arbres redwood du biome de démo, éditables ensuite
         this.schematicManager = new dev.sukkit.izanami.schem.SchematicManager(
                 new java.io.File(getDataFolder(), "schematics"), getLogger());
         setupCustomBlocks();
@@ -74,7 +76,51 @@ public final class IzanamiPlugin extends JavaPlugin {
         getLogger().info("Biome de demo enregistre : '" + biome.ah + "' (id " + biome.id
                 + ", client=" + biome.getClientBiome().ah + ", foret mixte oak+schematic)");
 
+        registerRedwoodBiome();
         registerDemoCaveBiome();
+    }
+
+    /**
+     * Forêt de Redwood (équivalent Taiga non enneigée) : arbres schematic
+     * IZ_RedwoodTree_* placés en variantes aléatoires (une grille dense) +
+     * quelques sapins vanilla en remplissage.
+     */
+    private void registerRedwoodBiome() {
+        java.util.List<dev.sukkit.izanami.tree.IzanamiTree> redwoods = new java.util.ArrayList<>();
+        for (String name : this.schematicManager.names()) {
+            if (name.startsWith("iz_redwoodtree")) {
+                redwoods.add(new dev.sukkit.izanami.tree.SchematicTree(
+                        this.schematicManager.get(name), true));
+            }
+        }
+        if (redwoods.isEmpty()) {
+            getLogger().warning("Biome Redwood ignore : aucun schematic IZ_RedwoodTree_* dans schematics/");
+            return;
+        }
+
+        // arbre Feature basé SDF (framework SALM/bclib porté) — Pythadendron de démo
+        dev.sukkit.izanami.tree.feature.trees.PythadendronTree pythadendron =
+                new dev.sukkit.izanami.tree.feature.trees.PythadendronTree(
+                        new dev.sukkit.izanami.tree.feature.trees.PythadendronConfig(
+                                net.minecraft.server.v1_8_R3.Blocks.LOG.fromLegacyData(0),        // chêne
+                                net.minecraft.server.v1_8_R3.Blocks.LEAVES.fromLegacyData(0 | 4))); // chêne persistant
+
+        // redwoods schematic (très larges) espacés + Pythadendron SDF + sapins vanilla
+        dev.sukkit.izanami.tree.IzanamiForest forest = dev.sukkit.izanami.tree.IzanamiForest.builder()
+                .add(new dev.sukkit.izanami.tree.RandomTree(redwoods), 26, 0.6)
+                .add(pythadendron, 24, 0.5)
+                .add(dev.sukkit.izanami.tree.JavaTree.spruce(), 10, 0.3)
+                .build();
+
+        dev.sukkit.izanami.api.CustomBiome biome = dev.sukkit.izanami.api.CustomBiome.builder("Redwood Forest")
+                .clientBiome(net.minecraft.server.v1_8_R3.BiomeBase.TAIGA)
+                .temperature(0.3F).humidity(0.8F)
+                .height(0.2F, 0.2F)
+                .grass(10).flowers(0)
+                .forest(forest)
+                .register();
+        getLogger().info("Biome enregistre : '" + biome.ah + "' (id " + biome.id + ", client=Taiga, "
+                + redwoods.size() + " variantes redwood + sapins)");
     }
 
     /**
@@ -274,10 +320,10 @@ public final class IzanamiPlugin extends JavaPlugin {
         if (sporeBlossom.exists()) {
             return;
         }
-        // comme en 1.17 : les 4 PÉTALES (spore_blossom.png) sont les plans
-        // inclinés vers le bas ; le petit centre vert (_base) est le plan plat
-        // collé au plafond
-        StringBuilder json = new StringBuilder("{\n"
+        // géométrie VANILLA (models/block/spore_blossom.json du client moderne) :
+        // plateau _base 14x14 collé au plafond + 4 pétales 16x16 qui débordent
+        // du bloc, pivotés de ±22.5° depuis leur arête haute
+        String json = "{\n"
                 + "  \"ambientocclusion\": false,\n"
                 + "  \"textures\": {\n"
                 + "    \"particle\": \"blocks/izanami/spore_blossom\",\n"
@@ -285,43 +331,56 @@ public final class IzanamiPlugin extends JavaPlugin {
                 + "    \"base\": \"blocks/izanami/spore_blossom_base\"\n"
                 + "  },\n"
                 + "  \"elements\": [\n"
-                + "    { \"from\": [5, 15.7, 5], \"to\": [11, 15.7, 11],\n"
+                + "    { \"from\": [1, 15.9, 1], \"to\": [15, 15.9, 15],\n"
                 + "      \"shade\": false,\n"
                 + "      \"faces\": {\n"
-                + "        \"down\": { \"uv\": [5, 5, 11, 11], \"texture\": \"#base\" },\n"
-                + "        \"up\": { \"uv\": [5, 5, 11, 11], \"texture\": \"#base\" } } }");
-        String[][] petals = {
-                {"[8, 15.7, 0]", "x", "22.5"},
-                {"[8, 15.7, 16]", "x", "-22.5"},
-                {"[0, 15.7, 8]", "z", "-22.5"},
-                {"[16, 15.7, 8]", "z", "22.5"}};
-        for (String[] petal : petals) {
-            json.append(",\n"
-                    + "    { \"from\": [0, 15.7, 0], \"to\": [16, 15.7, 16],\n"
-                    + "      \"rotation\": { \"origin\": ").append(petal[0])
-                    .append(", \"axis\": \"").append(petal[1])
-                    .append("\", \"angle\": ").append(petal[2]).append(" },\n"
-                    + "      \"shade\": false,\n"
-                    + "      \"faces\": {\n"
-                    + "        \"down\": { \"uv\": [0, 0, 16, 16], \"texture\": \"#flower\" },\n"
-                    + "        \"up\": { \"uv\": [0, 0, 16, 16], \"texture\": \"#flower\" } } }");
-        }
-        json.append("\n  ]\n}\n");
+                + "        \"up\":   { \"uv\": [1, 1, 15, 15], \"texture\": \"#base\" },\n"
+                + "        \"down\": { \"uv\": [1, 1, 15, 15], \"texture\": \"#base\" } } },\n"
+                + "    { \"from\": [8, 15.7, 0], \"to\": [24, 15.7, 16],\n"
+                + "      \"rotation\": { \"origin\": [8, 16, 0], \"axis\": \"z\", \"angle\": -22.5 },\n"
+                + "      \"shade\": false,\n"
+                + "      \"faces\": {\n"
+                + "        \"up\":   { \"uv\": [0, 0, 16, 16], \"texture\": \"#flower\", \"rotation\": 90 },\n"
+                + "        \"down\": { \"uv\": [0, 16, 16, 0], \"texture\": \"#flower\", \"rotation\": 270 } } },\n"
+                + "    { \"from\": [-8, 15.7, 0], \"to\": [8, 15.7, 16],\n"
+                + "      \"rotation\": { \"origin\": [8, 16, 0], \"axis\": \"z\", \"angle\": 22.5 },\n"
+                + "      \"shade\": false,\n"
+                + "      \"faces\": {\n"
+                + "        \"up\":   { \"uv\": [0, 0, 16, 16], \"texture\": \"#flower\", \"rotation\": 270 },\n"
+                + "        \"down\": { \"uv\": [0, 16, 16, 0], \"texture\": \"#flower\", \"rotation\": 90 } } },\n"
+                + "    { \"from\": [0, 15.7, 8], \"to\": [16, 15.7, 24],\n"
+                + "      \"rotation\": { \"origin\": [0, 16, 8], \"axis\": \"x\", \"angle\": 22.5 },\n"
+                + "      \"shade\": false,\n"
+                + "      \"faces\": {\n"
+                + "        \"up\":   { \"uv\": [16, 16, 0, 0], \"texture\": \"#flower\" },\n"
+                + "        \"down\": { \"uv\": [16, 0, 0, 16], \"texture\": \"#flower\" } } },\n"
+                + "    { \"from\": [0, 15.7, -8], \"to\": [16, 15.7, 8],\n"
+                + "      \"rotation\": { \"origin\": [0, 16, 8], \"axis\": \"x\", \"angle\": -22.5 },\n"
+                + "      \"shade\": false,\n"
+                + "      \"faces\": {\n"
+                + "        \"up\":   { \"uv\": [0, 0, 16, 16], \"texture\": \"#flower\" },\n"
+                + "        \"down\": { \"uv\": [0, 16, 16, 0], \"texture\": \"#flower\" } } }\n"
+                + "  ]\n}\n";
         java.nio.file.Files.write(sporeBlossom.toPath(),
-                json.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private void extractBundledTextures() {
+        extractBundled("textures/");
+    }
+
+    /** Copie les entrées {@code prefix...} du jar vers le dossier data (sans écraser). */
+    private void extractBundled(String prefix) {
         try (java.util.zip.ZipFile jar = new java.util.zip.ZipFile(getFile())) {
             java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = jar.entries();
             while (entries.hasMoreElements()) {
                 java.util.zip.ZipEntry entry = entries.nextElement();
-                if (entry.isDirectory() || !entry.getName().startsWith("textures/")) {
+                if (entry.isDirectory() || !entry.getName().startsWith(prefix)) {
                     continue;
                 }
                 java.io.File out = new java.io.File(getDataFolder(), entry.getName());
                 if (out.exists()) {
-                    continue; // ne jamais écraser une texture éditée par l'utilisateur
+                    continue; // ne jamais écraser un fichier édité par l'utilisateur
                 }
                 out.getParentFile().mkdirs();
                 try (java.io.InputStream in = jar.getInputStream(entry)) {
@@ -329,7 +388,7 @@ public final class IzanamiPlugin extends JavaPlugin {
                 }
             }
         } catch (java.io.IOException e) {
-            getLogger().severe("Extraction des textures embarquees : " + e.getMessage());
+            getLogger().severe("Extraction des fichiers embarques (" + prefix + ") : " + e.getMessage());
         }
     }
 }

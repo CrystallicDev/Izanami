@@ -36,7 +36,8 @@ public final class SchematicTree implements IzanamiTree {
         if (!world.getType(surface.down()).getBlock().getMaterial().isBuildable()) {
             return false;
         }
-        this.schematic.paste(world, surface, this.randomRotation ? random.nextInt(4) : 0);
+        // pasteTree cale la base du tronc pile sur la surface (indépendant du WEOffset)
+        this.schematic.pasteTree(world, surface, this.randomRotation ? random.nextInt(4) : 0);
         return true;
     }
 }

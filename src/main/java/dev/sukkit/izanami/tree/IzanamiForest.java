@@ -1,7 +1,9 @@
 package dev.sukkit.izanami.tree;
 
 import net.minecraft.server.v1_8_R3.BiomeBase;
+import net.minecraft.server.v1_8_R3.Block;
 import net.minecraft.server.v1_8_R3.BlockPosition;
+import net.minecraft.server.v1_8_R3.Blocks;
 import net.minecraft.server.v1_8_R3.World;
 
 import java.util.ArrayList;
@@ -73,10 +75,37 @@ public final class IzanamiForest {
                     if (world.getBiome(column) != owner) {
                         continue;
                     }
-                    entry.tree.place(world, random, world.getHighestBlockYAt(column));
+                    // planter sur le VRAI sol : getHighestBlockYAt inclut troncs
+                    // et feuilles des arbres déjà posés dans la passe → sans ça,
+                    // les arbres s'empilent sur les canopées voisines
+                    BlockPosition surface = groundSurface(world, px, pz);
+                    if (surface != null) {
+                        entry.tree.place(world, random, surface);
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Sol naturel de la colonne (juste au-dessus de la première herbe/terre/
+     * sable/gravier/pierre en descendant depuis le sommet), en ignorant troncs
+     * et feuillages. {@code null} si aucun sol ou si la colonne est immergée
+     * (pas d'arbre dans l'eau).
+     */
+    private static BlockPosition groundSurface(World world, int x, int z) {
+        int top = world.getHighestBlockYAt(new BlockPosition(x, 0, z)).getY();
+        for (int y = top; y > 1; y--) {
+            Block b = world.getType(new BlockPosition(x, y - 1, z)).getBlock();
+            if (b == Blocks.GRASS || b == Blocks.DIRT || b == Blocks.SAND
+                    || b == Blocks.GRAVEL || b == Blocks.STONE) {
+                if (world.getType(new BlockPosition(x, y, z)).getBlock().getMaterial().isLiquid()) {
+                    return null; // sol sous l'eau
+                }
+                return new BlockPosition(x, y, z);
+            }
+        }
+        return null;
     }
 
     private static long mix(long cx, long cz, long salt) {

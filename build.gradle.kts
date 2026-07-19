@@ -17,7 +17,6 @@ dependencies {
 
 tasks.jar {
     archiveFileName.set("Izanami.jar")
-    // output goes to build/libs
     // No shading needed — all deps are provided by the server
 }
 
